@@ -1,0 +1,51 @@
+name: "Terraform — QA"
+
+on:
+  pull_request:
+    branches: [ "main" ]   # cuando se abre/actualiza PR hacia main
+    paths:
+      - "**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write      # necesario para comentar en la PR
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    name: Terraform QA (plan)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Plan (qa)
+        id: plan
+        run: terraform plan -input=false -var-file=terraform.local.qa.tfvars
+
+    
+      - name: Comment PR with Plan
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: terraform-plan
+          message: |
+            ### Terraform Plan (QA)
+            ```
+            ${{ steps.plan.outputs.stdout }}
+            ```

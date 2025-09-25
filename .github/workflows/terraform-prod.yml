@@ -1,0 +1,42 @@
+name: "Terraform — Prod"
+
+on:
+  push:
+    branches: [ "main" ]          # solo main
+    paths:
+      - "**"                      # aplica a todo el repo
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  prod:
+    runs-on: ubuntu-latest
+    environment: prod             # habilita approvals si lo configuras en GitHub
+    name: Terraform Prod (plan + apply)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Plan (prod)
+        run: terraform plan -input=false -var-file=terraform.local.prod.tfvars -out=tfplan-prod
+
+      - name: Terraform Apply (prod)
+        run: terraform apply -input=false -auto-approve -var-file=terraform.local.prod.tfvars
